@@ -1,87 +1,91 @@
 from random import randint
+from typing import Dict, Tuple
 import requests
 
+
 class Pokemon:
-    pokemons = {}
-    # Инициализация объекта (конструктор)
-    def __init__(self, pokemon_trainer):
+    """Base class representing a Pokemon fetched from PokeAPI."""
 
+    pokemons: Dict[str, "Pokemon"] = {}
+
+    def __init__(self, pokemon_trainer: str):
         self.pokemon_trainer = pokemon_trainer
-        self.pokemon_number = randint(1,1000)
-        self.img = self.get_img()
-        self.name = self.get_name()
+        self.pokemon_number = randint(1, 1000)
+        self.power = randint(30, 50)
+        self.hp = randint(200, 400)
 
-        self.power = randint(30,50)
-        self.hp = randint(200,400)
-
+        # Fetch image and name in a single HTTP request
+        self.name, self.img = self._fetch_pokemon_data()
         Pokemon.pokemons[pokemon_trainer] = self
 
-    # Метод для получения картинки покемона через API
-    def get_img(self):
+    def _fetch_pokemon_data(self) -> Tuple[str, str]:
+        """Fetches Pokemon metadata and artwork URL from PokeAPI."""
         url = f'https://pokeapi.co/api/v2/pokemon/{self.pokemon_number}'
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            return (data['sprites']['other']['official-artwork']['front_default'])
-        else:
-            return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/1.png"
+        default_img = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/1.png"
+        default_name = "Pikachu"
 
-    # Метод для получения имени покемона через API
-    def get_name(self):
-        url = f'https://pokeapi.co/api/v2/pokemon/{self.pokemon_number}'
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            return (data['forms'][0]['name'])
-        else:
-            return "Pikachu"
+        try:
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                name = data.get('forms', [{}])[0].get('name', default_name).capitalize()
+                img = data.get('sprites', {}).get('other', {}).get('official-artwork', {}).get('front_default', default_img)
+                return name, img
+        except requests.RequestException:
+            pass
 
+        return default_name, default_img
 
-    # Метод класса для получения информации
-    def info(self):
-        return f"""Имя твоего покеомона: {self.name}
-                    Сила твоего покеомона: {self.power}
-                    Здоровье твоего покеомона: {self.hp}"""
+    def info(self) -> str:
+        """Returns stats summary for the Pokemon."""
+        return (
+            f"Pokemon Name: {self.name}\n"
+            f"Power Level: {self.power}\n"
+            f"Health Points (HP): {self.hp}"
+        )
 
-    # Метод класса для получения картинки покемона
-    def show_img(self):
+    def show_img(self) -> str:
+        """Returns the official artwork image URL."""
         return self.img
 
-
-    def attack(self, enemy):
-
-        if isinstance(enemy, Wizard): # Проверка на то, что enemy является типом данных Wizard (является экземпляром класса Волшебник)
-            chance = randint(1,5)
-            if chance == 1:
-                return "Покемон-волшебник применил щит в сражении"
+    def attack(self, enemy: "Pokemon") -> str:
+        """Executes attack against an opponent Pokemon."""
+        if isinstance(enemy, Wizard):
+            if randint(1, 5) == 1:
+                return f"Wizard Pokemon @{enemy.pokemon_trainer} blocked the attack with a magic shield!"
 
         if enemy.hp > self.power:
             enemy.hp -= self.power
-            return f"Сражение @{self.pokemon_trainer} с @{enemy.pokemon_trainer}"
+            return f"Battle between @{self.pokemon_trainer} and @{enemy.pokemon_trainer}. @{enemy.pokemon_trainer} has {enemy.hp} HP left."
         else:
             enemy.hp = 0
-            return f"Победа @{self.pokemon_trainer} над @{enemy.pokemon_trainer}! "
+            return f"Victory! @{self.pokemon_trainer} defeated @{enemy.pokemon_trainer}!"
 
 
 class Wizard(Pokemon):
-    def attack(self, enemy):
+    """Wizard Pokemon class specializing in defensive magic shields."""
+
+    def attack(self, enemy: Pokemon) -> str:
         return super().attack(enemy)
 
+
 class Fighter(Pokemon):
-    def attack(self, enemy):
-        super_power = randint(5,15)
+    """Fighter Pokemon class specializing in physical super-attacks."""
+
+    def attack(self, enemy: Pokemon) -> str:
+        super_power = randint(5, 15)
         self.power += super_power
         result = super().attack(enemy)
         self.power -= super_power
-        return result + f"\n Боец применил супер-атаку силой:{super_power} "
+        return f"{result}\n[Fighter Bonus] Applied super-attack with +{super_power} extra power!"
 
 
 if __name__ == '__main__':
-    wizard = Wizard("username1")
-    fighter = Fighter("username2")
+    wizard = Wizard("Trainer_Alice")
+    fighter = Fighter("Trainer_Bob")
 
     print(wizard.info())
-    print()
+    print("-" * 30)
     print(fighter.info())
-    print()
+    print("-" * 30)
     print(fighter.attack(wizard))
